@@ -3,12 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Tuan Budgeting Application</title>
+    <link rel="stylesheet" href="./style.css">
+
 </head>
 <body>
-    <div id="title">
-        <p>Budgeting App</p>
-    </div>
-    
+    <header>
+        <h1>My Budgeting App</h1>
+    </header>
+   
+    <main>
+        <section id="add-transaction">
+            <h2>Add Transaction</h2>
+            <form>
+                <input type="text" placeholder="Descripttion" required>
+                <input type="number" placeholder="Amount" required>
+                <button type="submit"> Add</button>
+            </form>
+        </section>
+
+        <section id="Transaction">
+            <h2>Transaction</h2>
+            <ul>
+                <!--Transaction appear here-->
+            </ul>
+        </section>
+    </main>
 </body>
 </html>
