@@ -5,29 +5,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tuan Budgeting Application</title>
     <link rel="stylesheet" href="./style.css">
-
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <header>
         <h1>My Budgeting App</h1>
+        <nav>
+            <button id="dashboard-tab" class="nav-btn active">Dashboard</button>
+            <button id="transactions-tab" class="nav-btn">Transactions</button>
+            <button id="budget-tab" class="nav-btn">Budget Overview</button>
+            <button id="charts-tab" class="nav-btn">Charts & Analytics</button>
+        </nav>
     </header>
    
     <main>
-        <section id="add-transaction">
-            <h2>Add Transaction</h2>
-            <form>
-                <input type="text" placeholder="Descripttion" required>
-                <input type="number" placeholder="Amount" required>
-                <button type="submit"> Add</button>
-            </form>
+        <section id="dashboard" class="tab-content active">
+            <div class="summary-cards">
+                <div class="card">
+                    <h3>Total Income</h3>
+                    <div id="total-income" class="amount">$0.00</div>
+                </div>
+                <div class="card">
+                    <h3>Total Expenses</h3>
+                    <div id="total-expenses" class="amount">$0.00</div>
+                </div>
+                <div class="card">
+                    <h3>Net Balance</h3>
+                    <div id="net-balance" class="amount">$0.00</div>
+                </div>
+            </div>
+            
+            <div class="recent-transactions">
+                <h3>Recent Transactions</h3>
+                <div id="recent-list"></div>
+            </div>
         </section>
 
-        <section id="Transaction">
-            <h2>Transaction</h2>
-            <ul>
-                <!--Transaction appear here-->
-            </ul>
+        <section id="transactions" class="tab-content">
+            <div id="add-transaction">
+                <h2>Add Transaction</h2>
+                <form id="transaction-form">
+                    <input type="text" id="description" placeholder="Description" required>
+                    <input type="number" id="amount" placeholder="Amount" step="0.01" required>
+                    <select id="category" required>
+                        <option value="">Select Category</option>
+                    </select>
+                    <select id="transaction-type" required>
+                        <option value="">Transaction Type</option>
+                        <option value="income">Income</option>
+                        <option value="expense">Expense</option>
+                    </select>
+                    <button class="submit-button" type="submit">Add Transaction</button>
+                </form>
+            </div>
+
+            <div id="transaction-list">
+                <h2>All Transactions</h2>
+                <div id="transactions-container">
+                    <!-- Transactions appear here -->
+                </div>
+            </div>
+        </section>
+
+        <section id="budget-overview" class="tab-content">
+            <h2>Budget Overview</h2>
+            <div id="budget-summary">
+                <!-- Budget summary cards appear here -->
+            </div>
+        </section>
+
+        <section id="charts" class="tab-content">
+            <h2>Charts & Analytics</h2>
+            <div class="charts-container">
+                <div class="chart-row">
+                    <div class="chart-card">
+                        <h3>Expense Breakdown by Category</h3>
+                        <canvas id="expenseChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Budget vs Actual Spending</h3>
+                        <canvas id="budgetChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-row">
+                    <div class="chart-card">
+                        <h3>Income vs Expenses</h3>
+                        <canvas id="incomeExpenseChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Monthly Spending Trend</h3>
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
+
+    <script src="./main.js"></script>
 </body>
 </html>
