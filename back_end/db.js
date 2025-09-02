@@ -1,39 +1,40 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
-const db_path = path.resolve(__dirname, 'budget.db');
-const db = new sqlite3.Database(db_path, (err) => {
+const dbPath = path.join(__dirname, 'budget.db');
+const schemaPath = path.join(__dirname, 'schema.sql');
+
+// Create database connection
+const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Error opening database:', err.message);
     } else {
-        console.log('Connected to SQLite database');
+        console.log('Connected to SQLite database.');
+        initializeDatabase();
     }
 });
 
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        budget_limit REAL DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        description TEXT NOT NULL,
-        amount REAL NOT NULL,
-        category_id INTEGER,
-        transaction_type TEXT CHECK(transaction_type IN ('income', 'expense')) NOT NULL,
-        date DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (category_id) REFERENCES categories (id)
-    )`);
-
-    db.run(`INSERT OR IGNORE INTO categories (name, budget_limit) VALUES 
-            ('Food', 500),
-            ('Transportation', 200),
-            ('Entertainment', 150),
-            ('Utilities', 300),
-            ('Income', 0)`);
-});
+function initializeDatabase() {
+    // Check if tables exist, if not, create them
+    db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'", (err, row) => {
+        if (err) {
+            console.error('Error checking for tables:', err.message);
+            return;
+        }
+        
+        if (!row) {
+            // Tables don't exist, create them from schema
+            const schema = fs.readFileSync(schemaPath, 'utf8');
+            db.exec(schema, (err) => {
+                if (err) {
+                    console.error('Error creating tables:', err.message);
+                } else {
+                    console.log('Database tables created successfully.');
+                }
+            });
+        }
+    });
+}
 
 module.exports = db;

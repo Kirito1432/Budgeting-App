@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 INSERT OR IGNORE INTO categories (name, budget_limit) VALUES 
-    ('Food', 500),
+    ('Food', 200),
     ('Transportation', 200),
     ('Entertainment', 150),
     ('Utilities', 300),
