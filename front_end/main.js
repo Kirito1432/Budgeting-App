@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     setupTabNavigation();
     setupTransactionForm();
+    setupExportButton();
     loadCategories();
     loadTransactions();
     loadBudgetSummary();
@@ -76,6 +77,33 @@ function setupTransactionForm() {
             }
         } catch (error) {
             showNotification('Network error', 'error');
+        }
+    });
+}
+
+function setupExportButton() {
+    const exportBtn = document.getElementById('export-csv-btn');
+    exportBtn.addEventListener('click', async () => {
+        try {
+            const response = await fetch(`${API_BASE}/export/csv`);
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'budget_transactions.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showNotification('CSV exported successfully!', 'success');
+            } else {
+                showNotification('Error exporting CSV', 'error');
+            }
+        } catch (error) {
+            showNotification('Network error during export', 'error');
         }
     });
 }

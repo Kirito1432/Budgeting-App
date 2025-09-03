@@ -162,6 +162,41 @@ app.get('/api/charts/income-expense', (req, res) => {
     });
 });
 
+app.get('/api/export/csv', (req, res) => {
+    const query = `
+        SELECT 
+            t.id,
+            t.description,
+            t.amount,
+            t.transaction_type,
+            t.date,
+            c.name as category_name
+        FROM transactions t 
+        LEFT JOIN categories c ON t.category_id = c.id 
+        ORDER BY t.date DESC
+    `;
+    
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        
+        // Convert to CSV format
+        const csvHeader = 'ID,Description,Amount,Type,Date,Category\n';
+        const csvRows = rows.map(row => 
+            `${row.id},"${row.description}",${row.amount},${row.transaction_type},${row.date},"${row.category_name || ''}"`
+        ).join('\n');
+        
+        const csvContent = csvHeader + csvRows;
+        
+        // Set headers for CSV download
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="budget_transactions.csv"');
+        res.send(csvContent);
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
