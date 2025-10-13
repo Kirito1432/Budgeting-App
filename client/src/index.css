@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: 262 83% 58%;
+  --color-secondary: 210 40% 96.1%;
+  --color-destructive: 0 84.2% 60.2%;
+  --color-muted: 210 40% 96.1%;
+  --color-accent: 210 40% 96.1%;
+  --radius: 0.5rem;
+}
