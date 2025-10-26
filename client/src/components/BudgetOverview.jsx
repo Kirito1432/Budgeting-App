@@ -5,14 +5,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle } from 'lucide-react'
+import PeriodSelector from './PeriodSelector'
 
-function BudgetOverview({ budgetSummary }) {
+function BudgetOverview({ budgetSummary, currentPeriod, onPeriodChange }) {
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold mb-2">Budget Overview</h2>
         <p className="text-muted-foreground">Track spending against your budget limits</p>
       </div>
+
+      {/* Period Selector */}
+      <PeriodSelector currentPeriod={currentPeriod} onPeriodChange={onPeriodChange} />
 
       {budgetSummary.length === 0 ? (
         <Card>

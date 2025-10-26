@@ -470,66 +470,412 @@ app.delete('/api/categories/:id', (req, res) => {
     });
 });
 
+// ==================== BUDGET PERIOD ENDPOINTS ====================
+
+/**
+ * GET /api/periods
+ * Retrieves all budget periods
+ * Returns: Array of period objects sorted by start_date descending
+ */
+app.get('/api/periods', (req, res) => {
+    const query = 'SELECT * FROM budget_periods ORDER BY start_date DESC';
+
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        res.json(rows);
+    });
+});
+
+/**
+ * GET /api/periods/current
+ * Gets the current active budget period based on today's date
+ * Returns: Current period object or null if none exists
+ */
+app.get('/api/periods/current', (req, res) => {
+    const query = `
+        SELECT * FROM budget_periods
+        WHERE DATE('now') BETWEEN DATE(start_date) AND DATE(end_date)
+        AND is_active = 1
+        ORDER BY start_date DESC
+        LIMIT 1
+    `;
+
+    db.get(query, [], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        res.json(row || null);
+    });
+});
+
+/**
+ * GET /api/periods/:id
+ * Gets a specific budget period by ID
+ * Returns: Period object with associated category budgets
+ */
+app.get('/api/periods/:id', (req, res) => {
+    const { id } = req.params;
+
+    db.get('SELECT * FROM budget_periods WHERE id = ?', [id], (err, period) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        if (!period) {
+            return res.status(404).json({ error: 'Period not found' });
+        }
+        res.json(period);
+    });
+});
+
+/**
+ * POST /api/periods
+ * Creates a new budget period
+ * Body: { period_type, start_date, end_date }
+ * Automatically copies budget limits from categories or previous period
+ */
+app.post('/api/periods', (req, res) => {
+    const { period_type, start_date, end_date } = req.body;
+
+    // Validation
+    if (!period_type || !start_date || !end_date) {
+        return res.status(400).json({ error: 'period_type, start_date, and end_date are required' });
+    }
+
+    if (!['weekly', 'monthly', 'yearly'].includes(period_type)) {
+        return res.status(400).json({ error: 'period_type must be weekly, monthly, or yearly' });
+    }
+
+    if (new Date(end_date) < new Date(start_date)) {
+        return res.status(400).json({ error: 'end_date must be after start_date' });
+    }
+
+    // Check for overlapping periods
+    const overlapQuery = `
+        SELECT id FROM budget_periods
+        WHERE (
+            (DATE(?) BETWEEN DATE(start_date) AND DATE(end_date))
+            OR (DATE(?) BETWEEN DATE(start_date) AND DATE(end_date))
+            OR (DATE(start_date) BETWEEN DATE(?) AND DATE(?))
+        )
+        AND is_active = 1
+    `;
+
+    db.get(overlapQuery, [start_date, end_date, start_date, end_date], (err, overlap) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (overlap) {
+            return res.status(400).json({ error: 'Period dates overlap with existing active period' });
+        }
+
+        // Create the period
+        const insertPeriod = `
+            INSERT INTO budget_periods (period_type, start_date, end_date, is_active, created_at)
+            VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)
+        `;
+
+        db.run(insertPeriod, [period_type, start_date, end_date], function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+
+            const periodId = this.lastID;
+
+            // Copy budget limits from categories table
+            const copyBudgets = `
+                INSERT INTO period_category_budgets (period_id, category_id, budget_limit)
+                SELECT ?, id, budget_limit
+                FROM categories
+                WHERE is_active = 1
+            `;
+
+            db.run(copyBudgets, [periodId], function(err) {
+                if (err) {
+                    return res.status(500).json({ error: err.message });
+                }
+
+                // Return the created period
+                db.get('SELECT * FROM budget_periods WHERE id = ?', [periodId], (err, period) => {
+                    if (err) {
+                        return res.status(500).json({ error: err.message });
+                    }
+                    res.status(201).json(period);
+                });
+            });
+        });
+    });
+});
+
+/**
+ * PUT /api/periods/:id
+ * Updates a budget period
+ * Body: { period_type?, start_date?, end_date?, is_active? }
+ */
+app.put('/api/periods/:id', (req, res) => {
+    const { id } = req.params;
+    const { period_type, start_date, end_date, is_active } = req.body;
+
+    // Check if period exists
+    db.get('SELECT * FROM budget_periods WHERE id = ?', [id], (err, period) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        if (!period) {
+            return res.status(404).json({ error: 'Period not found' });
+        }
+
+        // Build update query dynamically
+        const updates = [];
+        const values = [];
+
+        if (period_type !== undefined) {
+            if (!['weekly', 'monthly', 'yearly'].includes(period_type)) {
+                return res.status(400).json({ error: 'period_type must be weekly, monthly, or yearly' });
+            }
+            updates.push('period_type = ?');
+            values.push(period_type);
+        }
+
+        if (start_date !== undefined) {
+            updates.push('start_date = ?');
+            values.push(start_date);
+        }
+
+        if (end_date !== undefined) {
+            updates.push('end_date = ?');
+            values.push(end_date);
+        }
+
+        if (is_active !== undefined) {
+            updates.push('is_active = ?');
+            values.push(is_active ? 1 : 0);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        values.push(id);
+        const query = `UPDATE budget_periods SET ${updates.join(', ')} WHERE id = ?`;
+
+        db.run(query, values, function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+
+            // Return updated period
+            db.get('SELECT * FROM budget_periods WHERE id = ?', [id], (err, updatedPeriod) => {
+                if (err) {
+                    return res.status(500).json({ error: err.message });
+                }
+                res.json(updatedPeriod);
+            });
+        });
+    });
+});
+
+/**
+ * DELETE /api/periods/:id
+ * Deletes a budget period (and associated category budgets via CASCADE)
+ */
+app.delete('/api/periods/:id', (req, res) => {
+    const { id } = req.params;
+
+    db.run('DELETE FROM budget_periods WHERE id = ?', [id], function(err) {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Period not found' });
+        }
+
+        res.json({ success: true, message: 'Period deleted successfully' });
+    });
+});
+
+/**
+ * GET /api/periods/:id/budgets
+ * Gets category budget limits for a specific period
+ * Returns: Array of { category_id, category_name, budget_limit }
+ */
+app.get('/api/periods/:id/budgets', (req, res) => {
+    const { id } = req.params;
+
+    const query = `
+        SELECT
+            pcb.id,
+            pcb.category_id,
+            c.name as category_name,
+            pcb.budget_limit
+        FROM period_category_budgets pcb
+        JOIN categories c ON pcb.category_id = c.id
+        WHERE pcb.period_id = ?
+        ORDER BY c.name
+    `;
+
+    db.all(query, [id], (err, rows) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        res.json(rows);
+    });
+});
+
+/**
+ * PUT /api/periods/:id/budgets
+ * Updates category budget limits for a specific period
+ * Body: [{ category_id, budget_limit }, ...]
+ */
+app.put('/api/periods/:id/budgets', (req, res) => {
+    const { id } = req.params;
+    const budgets = req.body;
+
+    if (!Array.isArray(budgets) || budgets.length === 0) {
+        return res.status(400).json({ error: 'Request body must be an array of budget objects' });
+    }
+
+    // Verify period exists
+    db.get('SELECT id FROM budget_periods WHERE id = ?', [id], (err, period) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        if (!period) {
+            return res.status(404).json({ error: 'Period not found' });
+        }
+
+        // Update each budget
+        const updatePromises = budgets.map(budget => {
+            return new Promise((resolve, reject) => {
+                const query = `
+                    UPDATE period_category_budgets
+                    SET budget_limit = ?
+                    WHERE period_id = ? AND category_id = ?
+                `;
+
+                db.run(query, [budget.budget_limit, id, budget.category_id], function(err) {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
+        });
+
+        Promise.all(updatePromises)
+            .then(() => {
+                res.json({ success: true, message: 'Budgets updated successfully' });
+            })
+            .catch(err => {
+                res.status(500).json({ error: err.message });
+            });
+    });
+});
+
 // ==================== BUDGET SUMMARY ENDPOINTS ====================
 
 /**
  * GET /api/budget-summary
  * Calculates budget summary for all categories
- * Query params: start_date, end_date for date range filtering
+ * Query params:
+ *   - start_date, end_date for date range filtering
+ *   - period_id for period-specific budget limits
  * Returns: Array of budget objects with:
  *   - name: Category name
- *   - budget_limit: The budget limit for this category
+ *   - budget_limit: The budget limit for this category (from period or default)
  *   - spent: Total amount spent in this category
  *   - income: Total income in this category
  *   - remaining: Budget limit minus spent amount
  *   - percentage: Percentage of budget used
  */
 app.get('/api/budget-summary', (req, res) => {
-    const { start_date, end_date } = req.query;
+    const { start_date, end_date, period_id } = req.query;
 
-    let query = `
-        SELECT
-            c.name,
-            c.budget_limit,
-            COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) as spent,
-            COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) as income
-        FROM categories c
-        LEFT JOIN transactions t ON c.id = t.category_id
-    `;
+    // If period_id is provided, use period-specific budget limits
+    if (period_id) {
+        const query = `
+            SELECT
+                c.name,
+                COALESCE(pcb.budget_limit, c.budget_limit) as budget_limit,
+                COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) as spent,
+                COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) as income
+            FROM categories c
+            LEFT JOIN period_category_budgets pcb ON c.id = pcb.category_id AND pcb.period_id = ?
+            LEFT JOIN transactions t ON c.id = t.category_id
+                AND (? IS NULL OR DATE(t.date) >= DATE(?))
+                AND (? IS NULL OR DATE(t.date) <= DATE(?))
+            WHERE c.name != 'Income' AND c.is_active = 1
+            GROUP BY c.id, c.name, pcb.budget_limit, c.budget_limit
+        `;
 
-    const params = [];
-    const conditions = ['c.name != ?'];
-    params.push('Income');
+        const params = [period_id, start_date, start_date, end_date, end_date];
 
-    // Add date range filtering if provided
-    if (start_date) {
-        conditions.push('(t.id IS NULL OR DATE(t.date) >= DATE(?))');
-        params.push(start_date);
-    }
+        db.all(query, params, (err, rows) => {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
 
-    if (end_date) {
-        conditions.push('(t.id IS NULL OR DATE(t.date) <= DATE(?))');
-        params.push(end_date);
-    }
+            // Calculate remaining budget and percentage for each category
+            const summary = rows.map(row => ({
+                ...row,
+                remaining: row.budget_limit - row.spent,
+                percentage: row.budget_limit > 0 ? (row.spent / row.budget_limit) * 100 : 0
+            }));
 
-    query += ' WHERE ' + conditions.join(' AND ');
-    query += ' GROUP BY c.id, c.name, c.budget_limit';
+            res.json(summary);
+        });
+    } else {
+        // Use default category budget limits
+        let query = `
+            SELECT
+                c.name,
+                c.budget_limit,
+                COALESCE(SUM(CASE WHEN t.transaction_type = 'expense' THEN t.amount ELSE 0 END), 0) as spent,
+                COALESCE(SUM(CASE WHEN t.transaction_type = 'income' THEN t.amount ELSE 0 END), 0) as income
+            FROM categories c
+            LEFT JOIN transactions t ON c.id = t.category_id
+        `;
 
-    db.all(query, params, (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
+        const params = [];
+        const conditions = ['c.name != ?', 'c.is_active = 1'];
+        params.push('Income');
+
+        // Add date range filtering if provided
+        if (start_date) {
+            conditions.push('(t.id IS NULL OR DATE(t.date) >= DATE(?))');
+            params.push(start_date);
         }
 
-        // Calculate remaining budget and percentage for each category
-        const summary = rows.map(row => ({
-            ...row,
-            remaining: row.budget_limit - row.spent,
-            percentage: row.budget_limit > 0 ? (row.spent / row.budget_limit) * 100 : 0
-        }));
+        if (end_date) {
+            conditions.push('(t.id IS NULL OR DATE(t.date) <= DATE(?))');
+            params.push(end_date);
+        }
 
-        res.json(summary);
-    });
+        query += ' WHERE ' + conditions.join(' AND ');
+        query += ' GROUP BY c.id, c.name, c.budget_limit';
+
+        db.all(query, params, (err, rows) => {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+
+            // Calculate remaining budget and percentage for each category
+            const summary = rows.map(row => ({
+                ...row,
+                remaining: row.budget_limit - row.spent,
+                percentage: row.budget_limit > 0 ? (row.spent / row.budget_limit) * 100 : 0
+            }));
+
+            res.json(summary);
+        });
+    }
 });
 
 // ==================== CHART DATA ENDPOINTS ====================

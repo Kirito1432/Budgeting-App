@@ -7,12 +7,13 @@
  */
 
 import { useState, useEffect } from 'react'
-import { LayoutDashboard, Receipt, PieChart, BarChart3, FolderOpen } from 'lucide-react'
+import { LayoutDashboard, Receipt, PieChart, BarChart3, FolderOpen, CalendarRange } from 'lucide-react'
 import Dashboard from './components/Dashboard'
 import Transactions from './components/Transactions'
 import BudgetOverview from './components/BudgetOverview'
 import Charts from './components/Charts'
 import CategoryManagement from './components/CategoryManagement'
+import PeriodManagement from './components/PeriodManagement'
 import { Button } from '@/components/ui/button'
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
   const [categories, setCategories] = useState([])
   const [budgetSummary, setBudgetSummary] = useState([])
   const [dateFilter, setDateFilter] = useState({ start: null, end: null, preset: 'thisMonth' })
+  const [currentPeriod, setCurrentPeriod] = useState(null)
 
   /**
    * Fetch initial data when component mounts
@@ -31,12 +33,12 @@ function App() {
   }, [])
 
   /**
-   * Refetch transactions and budget summary when date filter changes
+   * Refetch transactions and budget summary when date filter or period changes
    */
   useEffect(() => {
     fetchTransactions()
     fetchBudgetSummary()
-  }, [dateFilter])
+  }, [dateFilter, currentPeriod])
 
   /**
    * Fetches all transactions from the API
@@ -81,12 +83,17 @@ function App() {
 
   /**
    * Fetches budget summary data from the API
-   * Applies date filter if set
+   * Applies date filter and period if set
    */
   const fetchBudgetSummary = async () => {
     try {
       let url = '/api/budget-summary'
       const params = new URLSearchParams()
+
+      // Add period_id if period is selected
+      if (currentPeriod) {
+        params.append('period_id', currentPeriod.id)
+      }
 
       if (dateFilter.start) {
         params.append('start_date', dateFilter.start)
@@ -238,6 +245,22 @@ function App() {
   }
 
   /**
+   * Handles period selection changes
+   * @param {Object} period - The selected period object
+   */
+  const handlePeriodChange = (period) => {
+    setCurrentPeriod(period)
+    // Optionally update date filter to match period dates
+    if (period) {
+      setDateFilter({
+        start: period.start_date,
+        end: period.end_date,
+        preset: 'custom'
+      })
+    }
+  }
+
+  /**
    * Adds a new category
    * @param {Object} categoryData - The category data to add
    * @returns {boolean} - True if successful, false otherwise
@@ -352,11 +375,23 @@ function App() {
           />
         )
       case 'budget':
-        return <BudgetOverview budgetSummary={budgetSummary} />
+        return (
+          <BudgetOverview
+            budgetSummary={budgetSummary}
+            currentPeriod={currentPeriod}
+            onPeriodChange={handlePeriodChange}
+          />
+        )
       case 'charts':
         return (
           <Charts
             dateFilter={dateFilter}
+          />
+        )
+      case 'periods':
+        return (
+          <PeriodManagement
+            onPeriodCreated={handlePeriodChange}
           />
         )
       default:
@@ -375,6 +410,7 @@ function App() {
     { id: 'transactions', label: 'Transactions', icon: Receipt },
     { id: 'categories', label: 'Categories', icon: FolderOpen },
     { id: 'budget', label: 'Budget', icon: PieChart },
+    { id: 'periods', label: 'Periods', icon: CalendarRange },
     { id: 'charts', label: 'Analytics', icon: BarChart3 },
   ]
 
