@@ -7,11 +7,12 @@
  */
 
 import { useState, useEffect } from 'react'
-import { LayoutDashboard, Receipt, PieChart, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, Receipt, PieChart, BarChart3, FolderOpen } from 'lucide-react'
 import Dashboard from './components/Dashboard'
 import Transactions from './components/Transactions'
 import BudgetOverview from './components/BudgetOverview'
 import Charts from './components/Charts'
+import CategoryManagement from './components/CategoryManagement'
 import { Button } from '@/components/ui/button'
 
 function App() {
@@ -20,22 +21,44 @@ function App() {
   const [transactions, setTransactions] = useState([])
   const [categories, setCategories] = useState([])
   const [budgetSummary, setBudgetSummary] = useState([])
+  const [dateFilter, setDateFilter] = useState({ start: null, end: null, preset: 'thisMonth' })
 
   /**
    * Fetch initial data when component mounts
    */
   useEffect(() => {
-    fetchTransactions()
     fetchCategories()
-    fetchBudgetSummary()
   }, [])
 
   /**
+   * Refetch transactions and budget summary when date filter changes
+   */
+  useEffect(() => {
+    fetchTransactions()
+    fetchBudgetSummary()
+  }, [dateFilter])
+
+  /**
    * Fetches all transactions from the API
+   * Applies date filter if set
    */
   const fetchTransactions = async () => {
     try {
-      const response = await fetch('/api/transactions')
+      let url = '/api/transactions'
+      const params = new URLSearchParams()
+
+      if (dateFilter.start) {
+        params.append('start_date', dateFilter.start)
+      }
+      if (dateFilter.end) {
+        params.append('end_date', dateFilter.end)
+      }
+
+      if (params.toString()) {
+        url += '?' + params.toString()
+      }
+
+      const response = await fetch(url)
       const data = await response.json()
       setTransactions(data)
     } catch (error) {
@@ -58,10 +81,25 @@ function App() {
 
   /**
    * Fetches budget summary data from the API
+   * Applies date filter if set
    */
   const fetchBudgetSummary = async () => {
     try {
-      const response = await fetch('/api/budget-summary')
+      let url = '/api/budget-summary'
+      const params = new URLSearchParams()
+
+      if (dateFilter.start) {
+        params.append('start_date', dateFilter.start)
+      }
+      if (dateFilter.end) {
+        params.append('end_date', dateFilter.end)
+      }
+
+      if (params.toString()) {
+        url += '?' + params.toString()
+      }
+
+      const response = await fetch(url)
       const data = await response.json()
       setBudgetSummary(data)
     } catch (error) {
@@ -93,6 +131,35 @@ function App() {
       return false
     } catch (error) {
       console.error('Error adding transaction:', error)
+      return false
+    }
+  }
+
+  /**
+   * Updates an existing transaction
+   * @param {number} id - The ID of the transaction to update
+   * @param {Object} transactionData - The updated transaction data
+   * @returns {boolean} - True if successful, false otherwise
+   */
+  const updateTransaction = async (id, transactionData) => {
+    try {
+      const response = await fetch(`/api/transactions/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transactionData),
+      })
+
+      if (response.ok) {
+        // Refresh data after successful update
+        await fetchTransactions()
+        await fetchBudgetSummary()
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Error updating transaction:', error)
       return false
     }
   }
@@ -157,6 +224,86 @@ function App() {
   }
 
   /**
+   * Adds a new category
+   * @param {Object} categoryData - The category data to add
+   * @returns {boolean} - True if successful, false otherwise
+   */
+  const addCategory = async (categoryData) => {
+    try {
+      const response = await fetch('/api/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(categoryData),
+      })
+
+      if (response.ok) {
+        // Refresh categories after successful addition
+        await fetchCategories()
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Error adding category:', error)
+      return false
+    }
+  }
+
+  /**
+   * Updates an existing category
+   * @param {number} id - The ID of the category to update
+   * @param {Object} categoryData - The updated category data
+   * @returns {boolean} - True if successful, false otherwise
+   */
+  const updateCategory = async (id, categoryData) => {
+    try {
+      const response = await fetch(`/api/categories/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(categoryData),
+      })
+
+      if (response.ok) {
+        // Refresh categories and budget summary after successful update
+        await fetchCategories()
+        await fetchBudgetSummary()
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Error updating category:', error)
+      return false
+    }
+  }
+
+  /**
+   * Deletes a category by ID
+   * @param {number} id - The ID of the category to delete
+   * @returns {boolean} - True if successful, false otherwise
+   */
+  const deleteCategory = async (id) => {
+    try {
+      const response = await fetch(`/api/categories/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Refresh categories and budget summary after successful deletion
+        await fetchCategories()
+        await fetchBudgetSummary()
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      return false
+    }
+  }
+
+  /**
    * Renders the appropriate component based on the active tab
    * @returns {JSX.Element} - The component for the active tab
    */
@@ -170,9 +317,19 @@ function App() {
             transactions={transactions}
             categories={categories}
             onAddTransaction={addTransaction}
+            onUpdateTransaction={updateTransaction}
             onDeleteTransaction={deleteTransaction}
             onExportCSV={exportToCSV}
             onClearDatabase={clearDatabase}
+          />
+        )
+      case 'categories':
+        return (
+          <CategoryManagement
+            categories={categories}
+            onAddCategory={addCategory}
+            onUpdateCategory={updateCategory}
+            onDeleteCategory={deleteCategory}
           />
         )
       case 'budget':
@@ -188,6 +345,7 @@ function App() {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'transactions', label: 'Transactions', icon: Receipt },
+    { id: 'categories', label: 'Categories', icon: FolderOpen },
     { id: 'budget', label: 'Budget', icon: PieChart },
     { id: 'charts', label: 'Analytics', icon: BarChart3 },
   ]
