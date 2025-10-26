@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import Chart from 'chart.js/auto'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-function Charts() {
+function Charts({ dateFilter }) {
   const expenseChartRef = useRef(null)
   const budgetChartRef = useRef(null)
   const incomeExpenseChartRef = useRef(null)
@@ -19,8 +19,13 @@ function Charts() {
 
   const chartInstances = useRef({})
 
+  // Fetch data when component mounts or when date filter changes
   useEffect(() => {
     fetchChartData()
+  }, [dateFilter])
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       Object.values(chartInstances.current).forEach(chart => chart?.destroy())
     }
@@ -33,11 +38,21 @@ function Charts() {
 
   const fetchChartData = async () => {
     try {
+      // Build query params for date filtering
+      const params = new URLSearchParams()
+      if (dateFilter?.start) {
+        params.append('start_date', dateFilter.start)
+      }
+      if (dateFilter?.end) {
+        params.append('end_date', dateFilter.end)
+      }
+      const queryString = params.toString() ? `?${params.toString()}` : ''
+
       const [expenseRes, budgetRes, incomeExpenseRes, trendRes] = await Promise.all([
-        fetch('/api/charts/expense-breakdown'),
-        fetch('/api/budget-summary'),
-        fetch('/api/charts/income-expense'),
-        fetch('/api/charts/monthly-trend')
+        fetch(`/api/charts/expense-breakdown${queryString}`),
+        fetch(`/api/budget-summary${queryString}`),
+        fetch(`/api/charts/income-expense${queryString}`),
+        fetch(`/api/charts/monthly-trend${queryString}`)
       ])
       setExpenseData(await expenseRes.json())
       setBudgetData(await budgetRes.json())

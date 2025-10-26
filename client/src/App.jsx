@@ -224,6 +224,20 @@ function App() {
   }
 
   /**
+   * Handles date filter changes
+   * @param {string} startDate - The start date (YYYY-MM-DD) or null
+   * @param {string} endDate - The end date (YYYY-MM-DD) or null
+   * @param {string} presetName - The name of the preset filter applied
+   */
+  const handleDateFilterChange = (startDate, endDate, presetName) => {
+    setDateFilter({
+      start: startDate,
+      end: endDate,
+      preset: presetName
+    })
+  }
+
+  /**
    * Adds a new category
    * @param {Object} categoryData - The category data to add
    * @returns {boolean} - True if successful, false otherwise
@@ -310,7 +324,12 @@ function App() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard transactions={transactions} />
+        return (
+          <Dashboard
+            transactions={transactions}
+            onDateFilterChange={handleDateFilterChange}
+          />
+        )
       case 'transactions':
         return (
           <Transactions
@@ -335,9 +354,18 @@ function App() {
       case 'budget':
         return <BudgetOverview budgetSummary={budgetSummary} />
       case 'charts':
-        return <Charts />
+        return (
+          <Charts
+            dateFilter={dateFilter}
+          />
+        )
       default:
-        return <Dashboard transactions={transactions} />
+        return (
+          <Dashboard
+            transactions={transactions}
+            onDateFilterChange={handleDateFilterChange}
+          />
+        )
     }
   }
 

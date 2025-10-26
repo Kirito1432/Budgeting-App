@@ -577,21 +577,46 @@ app.get('/api/charts/expense-breakdown', (req, res) => {
 /**
  * GET /api/charts/monthly-trend
  * Gets income and expenses grouped by month for trend charts
- * Returns: Array of { month, income, expenses } for the last 12 months
+ * Query params: start_date, end_date for date range filtering
+ * Returns: Array of { month, income, expenses } for the filtered period or last 12 months
  */
 app.get('/api/charts/monthly-trend', (req, res) => {
-    const query = `
+    const { start_date, end_date } = req.query;
+
+    let query = `
         SELECT
             strftime('%Y-%m', date) as month,
             SUM(CASE WHEN transaction_type = 'income' THEN amount ELSE 0 END) as income,
             SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END) as expenses
         FROM transactions
-        GROUP BY strftime('%Y-%m', date)
-        ORDER BY month DESC
-        LIMIT 12
     `;
 
-    db.all(query, [], (err, rows) => {
+    const params = [];
+    const conditions = [];
+
+    // Add date range filtering if provided
+    if (start_date) {
+        conditions.push('DATE(date) >= DATE(?)');
+        params.push(start_date);
+    }
+
+    if (end_date) {
+        conditions.push('DATE(date) <= DATE(?)');
+        params.push(end_date);
+    }
+
+    if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ' GROUP BY strftime(\'%Y-%m\', date) ORDER BY month DESC';
+
+    // Only apply LIMIT if no date filter is specified
+    if (!start_date && !end_date) {
+        query += ' LIMIT 12';
+    }
+
+    db.all(query, params, (err, rows) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;

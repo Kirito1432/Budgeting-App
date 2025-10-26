@@ -26,8 +26,23 @@ function BudgetOverview({ budgetSummary }) {
             const percentage = Math.min(budget.percentage, 100)
             const isOverBudget = budget.percentage > 100
 
+            // Determine progress bar color based on percentage
+            const getProgressColor = () => {
+              if (isOverBudget) return 'bg-gradient-to-r from-red-500 to-red-600'
+              if (budget.percentage >= 90) return 'bg-gradient-to-r from-orange-500 to-red-500'
+              if (budget.percentage >= 70) return 'bg-gradient-to-r from-yellow-500 to-orange-500'
+              return 'bg-gradient-to-r from-green-500 to-emerald-500'
+            }
+
+            const getBorderColor = () => {
+              if (isOverBudget) return 'border-red-300'
+              if (budget.percentage >= 90) return 'border-orange-300'
+              if (budget.percentage >= 70) return 'border-yellow-300'
+              return 'border-green-200'
+            }
+
             return (
-              <Card key={index} className={isOverBudget ? 'border-red-300' : ''}>
+              <Card key={index} className={`${getBorderColor()} transition-colors`}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{budget.name}</CardTitle>
@@ -35,6 +50,12 @@ function BudgetOverview({ budgetSummary }) {
                       <Badge variant="destructive" className="flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" />
                         Over Budget
+                      </Badge>
+                    )}
+                    {!isOverBudget && budget.percentage >= 90 && (
+                      <Badge className="bg-orange-500 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Near Limit
                       </Badge>
                     )}
                   </div>
@@ -57,18 +78,41 @@ function BudgetOverview({ budgetSummary }) {
                     </div>
                   </div>
 
+                  {/* Enhanced Progress Bar */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">{budget.percentage.toFixed(1)}%</span>
+                      <span className="text-muted-foreground font-medium">Budget Progress</span>
+                      <span className={`font-bold ${
+                        isOverBudget ? 'text-red-600' :
+                        budget.percentage >= 90 ? 'text-orange-600' :
+                        budget.percentage >= 70 ? 'text-yellow-600' :
+                        'text-green-600'
+                      }`}>
+                        {budget.percentage.toFixed(1)}%
+                      </span>
                     </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all ${
-                          isOverBudget ? 'bg-red-500' : 'bg-primary'
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      />
+
+                    {/* Large visual progress bar */}
+                    <div className="relative">
+                      <div className="h-6 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                        <div
+                          className={`h-full transition-all duration-500 ease-out ${getProgressColor()} ${
+                            isOverBudget ? 'animate-pulse' : ''
+                          }`}
+                          style={{ width: `${percentage}%` }}
+                        >
+                          {/* Shine effect */}
+                          <div className="h-full w-full bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                        </div>
+                      </div>
+
+                      {/* Percentage markers */}
+                      <div className="flex justify-between mt-1 text-xs text-muted-foreground">
+                        <span>0%</span>
+                        <span className="text-yellow-600">70%</span>
+                        <span className="text-orange-600">90%</span>
+                        <span className="text-red-600">100%</span>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

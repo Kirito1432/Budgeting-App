@@ -12,8 +12,9 @@ import { useMemo } from 'react'
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import DateRangeFilter from './DateRangeFilter'
 
-function Dashboard({ transactions }) {
+function Dashboard({ transactions, onDateFilterChange }) {
   /**
    * Calculate financial summary from transactions
    * Memoized to avoid recalculation on every render
@@ -41,6 +42,9 @@ function Dashboard({ transactions }) {
 
   return (
     <div className="space-y-8">
+      {/* Date Range Filter */}
+      <DateRangeFilter onFilterChange={onDateFilterChange} />
+
       {/* Summary Cards Section */}
       <div className="grid gap-4 md:grid-cols-3">
         {/* Total Income Card */}
